@@ -135,7 +135,7 @@ export function SavingsCalculator({ packages }: { packages: Package[] }) {
         // ב-`onChange` מוחק את הקלט המקורי, ולכן אי אפשר להבחין בין
         // קיטום לבין סכום תקין. הנוסח מתאר את התקרה במקום להאשים
         // את המשתמש בקלט שלא בהכרח הקליד.
-        `${MAX_SPEND.toLocaleString("he-IL")} ₪ הוא הסכום הגבוה ביותר שהמחשבון מטפל בו — לחשבון גדול יותר נציג יבדוק אתכם ידנית.`
+        `${shekels(MAX_SPEND)} הוא הסכום הגבוה ביותר שהמחשבון מטפל בו — לחשבון גדול יותר נציג יבדוק אתכם ידנית.`
       : "";
 
   return (
@@ -187,7 +187,7 @@ export function SavingsCalculator({ packages }: { packages: Package[] }) {
             ))}
           </div>
           <p className="mt-3 text-xs text-lp-ink-3">
-            מחפשים הנחה בחשמל? הלשונית &quot;חשמל&quot; למעלה מציגה את כל המסלולים.
+            מחפשים הנחה בחשמל? הלשונית &quot;חשמל&quot; בקטלוג שמתחת מציגה את כל המסלולים.
           </p>
         </div>
       )}
@@ -217,6 +217,11 @@ export function SavingsCalculator({ packages }: { packages: Package[] }) {
                   // ⚠️ באותו פורמט שהרמז מתחת מציג ("5,000 ₪") — `parseSpend`
                   // מקבל מפריד אלפים, והשדה לא סותר את ההסבר שלידו.
                   setSpend(parsed >= MAX_SPEND ? MAX_SPEND.toLocaleString("he-IL") : next);
+                  // ⚠️ אותו כלל של `blurred`, רק לדגל השני: אחרי לחיצה על
+                  // ה-CTA בשדה ריק `attempted` נשאר דלוק, וכל מצב ביניים
+                  // של `1,200` (`1,` `1,2` `1,20`) הכריז שוב "הזינו סכום".
+                  // ההסבר חוזר ב-blur או בלחיצה הבאה — לא בכל הקשה.
+                  setAttempted(false);
                 }}
                 onBlur={() => setBlurred(true)}
                 /*

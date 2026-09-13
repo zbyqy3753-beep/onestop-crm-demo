@@ -4,6 +4,7 @@ import { test } from "node:test";
 import {
   MAX_SPEND,
   MIN_SPEND,
+  addonFreeThenPaid,
   afterPriceDependsOnLines,
   computeSaving,
   declaresRiseInText,
@@ -42,6 +43,9 @@ test("קלט: שתי נקודות עשרוניות אינן מספר — `1.2.3`
 test("קלט: מפרידי אלפים, ספרות ערביות וקיטום לתקרה", () => {
   assert.equal(parseSpend("1,200"), 1200);
   assert.equal(parseSpend("٢٢٠"), 220);
+  // המקלדת הערבית מפיקה גם את המפרידים שלה, לא רק את הספרות.
+  assert.equal(parseSpend("٢٢٠٫٥"), 220.5);
+  assert.equal(parseSpend("١٬٢٠٠"), 1200);
   assert.equal(parseSpend("9000"), MAX_SPEND);
 });
 
@@ -229,6 +233,23 @@ test("בית: נתב שמתומחר מחוץ למחיר פוסל את החביל
   assert.equal(routerPricedSeparately(fake("עלות נתב 0 ש\"ח")), false);
   assert.equal(routerPricedSeparately(fake("נתב כלול במחיר")), false);
   assert.equal(routerPricedSeparately(fake("139 ₪ + 34.9 ₪ נתב סטאר = 173.9 ₪")), false);
+});
+
+test("תוספת שניתנת חינם ואחר כך מחויבת פוסלת את החבילה", () => {
+  const fake = (description) => ({ name: "x", description, benefits: null });
+  // HOT "סיב 1000/100 כולל NEXT TV": 119 → 135, ובטקסט "12 ערוצי דרמות
+  // חינם אח"כ 49.9" ו-"2חודשים HBO אח"כ 25שח". הייתה הבחירה של מסלול הבית.
+  const hot = PACKAGES.find((p) => p.name === "סיב 1000/100 כולל NEXT TV");
+  assert.ok(hot, "החבילה נעלמה מהקטלוג");
+  assert.ok(addonFreeThenPaid(hot), "התוספת שהופכת לבתשלום לא זוהתה");
+  assert.equal(isComparable(hot, "home"), false, "נכנסה לבריכה למרות תוספת בתשלום");
+  assert.ok(addonFreeThenPaid(fake("ערוצי ספורט ללא עלות ואח״כ 29.9")));
+  // עליית המחיר עצמו אינה תוספת — לזה יש priceAfterPromo.
+  assert.equal(addonFreeThenPaid(fake("חודשיים ב-59 ש\"ח אח\"כ 119 ש\"ח")), false);
+  assert.equal(addonFreeThenPaid(fake("נתב כלול במחיר")), false);
+  // הבחירה של הבית לא נשענת יותר עליה.
+  const pick = computeSaving(PACKAGES, "home", 1, 250).pick;
+  assert.notEqual(pick?.name, "סיב 1000/100 כולל NEXT TV");
 });
 
 test("מדרגת קווים שמייקרת נלקחת כפי שהיא, בלי Math.min", () => {

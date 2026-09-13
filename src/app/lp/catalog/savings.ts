@@ -146,6 +146,28 @@ export function routerPricedSeparately(p: Package): boolean {
 }
 
 /**
+ * חבילה שכוללת תוספת (חבילת ערוצים, HBO) שניתנת **חינם לתקופה ואחר כך
+ * מחויבת** — חיוב חודשי שמחיר-אחרי-ההטבה לא מכיל.
+ *
+ * ⚠️ זה החור שנשאר אחרי `routerPricedSeparately`, רק לתוכן במקום
+ * לציוד. HOT "סיב 1000/100 כולל NEXT TV" — הבחירה של מסלול הבית —
+ * רשומה 119 → 135, ובטקסט: "12 ערוצי דרמות חינם אח"כ 49.9" ו-"2חודשים
+ * HBO אח"כ 25שח". `RISE_IN_TEXT` היה תופס את `אח"כ`, אבל `isComparable`
+ * מדלג עליו ברגע שיש `priceAfterPromo` מספרי — כי הניחה שהמספר הזה
+ * הוא כל החשבון. כאן הוא לא: מהחודש הרביעי החשבון הוא 135 ועוד 74.9
+ * על תוכן שנכנס לחבילה בחינם, וכותרת של "₪115 בחודש" נבנתה על המספר
+ * הקטן.
+ *
+ * הנוסח מכוון: "חינם אח"כ N" / "ללא עלות ואח"כ N". "חודשיים ב-59 אח"כ
+ * 119" (המחיר עצמו עולה) אינו נתפס — לזה יש `priceAfterPromo`.
+ */
+const ADDON_FREE_THEN_PAID = /(?:חינם|ללא עלות|במתנה)\s*ו?אח["״]?כ\s?\d|חודש(?:ים|יים)\s+[^\n\d]{2,30}?\s?אח["״]?כ\s?\d/;
+
+export function addonFreeThenPaid(p: Package): boolean {
+  return ADDON_FREE_THEN_PAID.test(`${p.description ?? ""} ${p.benefits ?? ""}`);
+}
+
+/**
  * חבילה שהמבקר במסלול הזה באמת יכול לעבור אליה.
  *
  * ⚠️ הפילטר הזה הוא מה שמפריד בין "עד כמה אפשר לחסוך" לבין מספר
@@ -176,6 +198,9 @@ export function isComparable(p: Package, track: Track): p is MonthlyPackage {
   // ⚠️ מחיר-אחרי-הטבה אחד לחבילה שמצהירה על מחיר לפי כמות. ראה
   // `afterPriceDependsOnLines`.
   if (afterPriceDependsOnLines(p)) return false;
+  // ⚠️ תוכן (או שירות) שנכנס בחינם ומתחיל להיות מחויב הוא חיוב חודשי שמחיר-אחרי-
+  // ההטבה לא מכיל. ראה `addonFreeThenPaid`.
+  if (addonFreeThenPaid(p)) return false;
 
   if (track === "cellular") {
     const spec = p.spec as CellularSpec;
@@ -351,6 +376,10 @@ const AMOUNT = /^₪?\s*(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d{1,2})?\s*₪?$/;
 export function parseSpend(raw: string): number {
   const ascii = raw
     .replace(/[٠-٩۰-۹]/g, (d) => String((d.codePointAt(0)! - 0x0660) % 16))
+    // אותה מקלדת מפיקה גם מפריד עשרוני `٫` ומפריד אלפים `٬` — בלי
+    // השורה הזו `٢٢٠٫٥` נפסל בעוד שההודעה מציעה "220.50".
+    .replace(/٫/g, ".")
+    .replace(/٬/g, ",")
     .trim();
   if (!AMOUNT.test(ascii)) return 0;
   const value = Number(ascii.replace(/[^\d.]/g, ""));
